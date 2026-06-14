@@ -110,6 +110,10 @@ export function useGhostStore() {
     setKeys([...keys, newKey]);
   };
 
+  const deleteKey = (keyId: string) => {
+    setKeys(keys.filter(k => k.id !== keyId));
+  };
+
   const sellGame = (gameId: number) => {
     const availableKeyIndex = keys.findIndex(k => k.gameId === gameId && !k.isSold);
     if (availableKeyIndex === -1) return null;
@@ -145,5 +149,10 @@ export function useGhostStore() {
     setGames([...games, { ...newGame, id }]);
   };
 
-  return { games, keys, sales, addKey, sellGame, updateGame, addGame, isLoaded };
+  const deleteGame = (gameId: number) => {
+    setGames(games.filter(g => g.id !== gameId));
+    setKeys(keys.filter(k => k.gameId !== gameId));
+  };
+
+  return { games, keys, sales, addKey, deleteKey, sellGame, updateGame, addGame, deleteGame, isLoaded };
 }
