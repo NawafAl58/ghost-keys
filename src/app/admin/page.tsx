@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
@@ -9,13 +9,17 @@ import {
   Plus, 
   LogOut, 
   ShieldAlert,
-  ArrowRightLeft,
   Settings,
   TrendingUp,
   ShoppingCart,
-  Database
+  Database,
+  Edit2,
+  Trash2,
+  Save,
+  X,
+  PlusCircle
 } from 'lucide-react';
-import { useGhostStore } from '@/lib/store';
+import { useGhostStore, Game } from '@/lib/store';
 
 const ADMIN_PASSCODE = process.env.NEXT_PUBLIC_ADMIN_PASSCODE || 'N5858';
 
@@ -25,7 +29,21 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'keys' | 'sales'>('overview');
   
-  const { games, keys, sales, isLoaded } = useGhostStore();
+  const { games, keys, sales, addKey, updateGame, addGame, isLoaded } = useGhostStore();
+
+  // Form States
+  const [isAddingGame, setIsAddingGame] = useState(false);
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [newKeyData, setNewKeyData] = useState({ gameId: 0, value: '' });
+  const [newGameData, setNewGameData] = useState({
+    title: '',
+    price: 0,
+    platform: 'Steam',
+    image: '',
+    tag: 'جديد',
+    perf: 'ممتاز',
+    status: 'In Stock' as const
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +53,30 @@ export default function AdminPage() {
     } else {
       setLoginError(true);
       setTimeout(() => setLoginError(false), 2000);
+    }
+  };
+
+  const handleAddGame = (e: React.FormEvent) => {
+    e.preventDefault();
+    addGame(newGameData);
+    setIsAddingGame(false);
+    setNewGameData({ title: '', price: 0, platform: 'Steam', image: '', tag: 'جديد', perf: 'ممتاز', status: 'In Stock' });
+  };
+
+  const handleUpdateGame = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingGame) {
+      updateGame(editingGame);
+      setEditingGame(null);
+    }
+  };
+
+  const handleAddKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newKeyData.gameId && newKeyData.value) {
+      addKey(Number(newKeyData.gameId), newKeyData.value);
+      setNewKeyData({ gameId: 0, value: '' });
+      alert("تمت إضافة الكود بنجاح!");
     }
   };
 
@@ -57,7 +99,8 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background text-white flex">
-      <aside className="w-64 border-l border-white/5 glass hidden lg:flex flex-col">
+      {/* Sidebar */}
+      <aside className="w-64 border-l border-white/5 glass hidden lg:flex flex-col fixed inset-y-0 right-0">
         <div className="p-8">
           <div className="flex items-center gap-2 mb-10">
             <div className="w-8 h-8 rounded-lg bg-neonPurple flex items-center justify-center"><Settings size={18} /></div>
@@ -65,10 +108,10 @@ export default function AdminPage() {
           </div>
           <nav className="space-y-2">
             {[
-              { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
-              { id: 'inventory', label: 'المخزون', icon: Package },
-              { id: 'keys', label: 'الأكواد', icon: KeyIcon },
-              { id: 'sales', label: 'المبيعات', icon: BarChart3 },
+              { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
+              { id: 'inventory', label: 'إدارة الألعاب', icon: Package },
+              { id: 'keys', label: 'إضافة أكواد', icon: KeyIcon },
+              { id: 'sales', label: 'سجل المبيعات', icon: BarChart3 },
             ].map((item) => (
               <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${activeTab === item.id ? 'bg-neonPurple text-white shadow-lg shadow-neonPurple/20' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}><item.icon size={18} />{item.label}</button>
             ))}
@@ -79,24 +122,199 @@ export default function AdminPage() {
         </div>
       </aside>
 
-      <main className="flex-1 p-8 lg:p-12 overflow-y-auto">
+      <main className="flex-1 lg:pr-64 p-8 lg:p-12 overflow-y-auto">
         <header className="flex items-center justify-between mb-12">
-          <h2 className="text-3xl font-black">{activeTab === 'overview' ? 'الإحصائيات العامة' : activeTab === 'inventory' ? 'إدارة المنتجات' : activeTab === 'keys' ? 'مخزن الأكواد' : 'سجل العمليات'}</h2>
+          <h2 className="text-3xl font-black">
+            {activeTab === 'overview' && 'نظرة عامة'}
+            {activeTab === 'inventory' && 'المخزون والأسعار'}
+            {activeTab === 'keys' && 'إدارة مفاتيح الألعاب'}
+            {activeTab === 'sales' && 'سجل العمليات'}
+          </h2>
+          {activeTab === 'inventory' && (
+            <button 
+              onClick={() => setIsAddingGame(true)}
+              className="bg-neonPurple px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:brightness-110 transition-all"
+            >
+              <PlusCircle size={18} />
+              إضافة لعبة جديدة
+            </button>
+          )}
         </header>
 
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && (
             <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard label="إجمالي المبيعات" value={`${sales.reduce((acc, s) => acc + s.price, 0)} SAR`} icon={TrendingUp} color="purple" />
-                <StatCard label="عدد الطلبات" value={sales.length.toString()} icon={ShoppingCart} color="blue" />
+                <StatCard label="إجمالي الأرباح" value={`${sales.reduce((acc, s) => acc + s.price, 0)} SAR`} icon={TrendingUp} color="purple" />
+                <StatCard label="الطلبات المكتملة" value={sales.length.toString()} icon={ShoppingCart} color="blue" />
                 <StatCard label="الأكواد المتوفرة" value={keys.filter(k => !k.isSold).length.toString()} icon={Database} color="ice" />
               </div>
             </motion.div>
           )}
-          {/* Detailed sections simplified for space, logic handled via useGhostStore */}
+
+          {activeTab === 'inventory' && (
+            <motion.div key="inventory" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+              <div className="glass rounded-[2rem] overflow-hidden border-white/5">
+                <table className="w-full text-right">
+                  <thead className="bg-white/5 text-white/40 text-xs font-bold">
+                    <tr>
+                      <th className="px-8 py-6">اللعبة</th>
+                      <th className="px-8 py-6">المنصة</th>
+                      <th className="px-8 py-6">السعر (SAR)</th>
+                      <th className="px-8 py-6">الأداء</th>
+                      <th className="px-8 py-6">الحالة</th>
+                      <th className="px-8 py-6">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {games.map(game => (
+                      <tr key={game.id} className="hover:bg-white/[0.02]">
+                        <td className="px-8 py-6 font-bold">{game.title}</td>
+                        <td className="px-8 py-6 text-white/60">{game.platform}</td>
+                        <td className="px-8 py-6 font-black text-neonPurple">{game.price}</td>
+                        <td className="px-8 py-6 text-xs text-iceBlue">{game.perf}</td>
+                        <td className="px-8 py-6">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${game.status === 'In Stock' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                            {game.status === 'In Stock' ? 'متوفر' : 'منتهي'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6">
+                          <button onClick={() => setEditingGame(game)} className="p-2 hover:text-neonPurple transition-colors"><Edit2 size={18} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'keys' && (
+            <motion.div key="keys" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl">
+              <div className="glass p-8 rounded-[2rem] border-white/5">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><KeyIcon className="text-iceBlue" /> إضافة أكواد تفعيل</h3>
+                <form onSubmit={handleAddKey} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-white/40 mb-2">اختر اللعبة</label>
+                    <select 
+                      value={newKeyData.gameId}
+                      onChange={(e) => setNewKeyData({...newKeyData, gameId: Number(e.target.value)})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue"
+                    >
+                      <option value={0} className="bg-black">--- اختر لعبة ---</option>
+                      {games.map(g => <option key={g.id} value={g.id} className="bg-black">{g.title}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-white/40 mb-2">كود التفعيل (Key)</label>
+                    <input 
+                      type="text" 
+                      placeholder="XXXX-XXXX-XXXX"
+                      value={newKeyData.value}
+                      onChange={(e) => setNewKeyData({...newKeyData, value: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue font-mono"
+                    />
+                  </div>
+                  <button type="submit" className="w-full bg-iceBlue text-black font-bold py-4 rounded-xl hover:brightness-110 transition-all">حفظ الكود في المخزن</button>
+                </form>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'sales' && (
+             <motion.div key="sales" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-[2rem] overflow-hidden border-white/5">
+                <table className="w-full text-right">
+                  <thead className="bg-white/5 text-white/40 text-xs font-bold">
+                    <tr>
+                      <th className="px-8 py-6">الطلب</th>
+                      <th className="px-8 py-6">التاريخ</th>
+                      <th className="px-8 py-6">الكود المباع</th>
+                      <th className="px-8 py-6">المبلغ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {sales.map(sale => (
+                      <tr key={sale.id}>
+                        <td className="px-8 py-6">
+                          <div className="font-bold">{sale.gameTitle}</div>
+                          <div className="text-[10px] text-white/20">ID: {sale.id}</div>
+                        </td>
+                        <td className="px-8 py-6 text-sm text-white/40">{new Date(sale.soldAt).toLocaleString('ar-SA')}</td>
+                        <td className="px-8 py-6 font-mono text-iceBlue">{sale.keyValue}</td>
+                        <td className="px-8 py-6 font-black text-neonPurple">{sale.price} SAR</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+             </motion.div>
+          )}
         </AnimatePresence>
-        <footer className="mt-20 text-center text-[10px] text-white/20 uppercase tracking-widest pb-10">Ghost Keys Admin System • Made with ❤️ by N58</footer>
+
+        {/* Add Game Modal */}
+        {isAddingGame && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsAddingGame(false)} />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-2xl glass neon-border-purple rounded-[2.5rem] p-10">
+              <h3 className="text-2xl font-black mb-8">إضافة لعبة جديدة للمتجر</h3>
+              <form onSubmit={handleAddGame} className="grid grid-cols-2 gap-6">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-white/40 mb-2">اسم اللعبة</label>
+                  <input type="text" required value={newGameData.title} onChange={e => setNewGameData({...newGameData, title: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-neonPurple" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-white/40 mb-2">السعر (SAR)</label>
+                  <input type="number" required value={newGameData.price} onChange={e => setNewGameData({...newGameData, price: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-neonPurple" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-white/40 mb-2">المنصة</label>
+                  <input type="text" required value={newGameData.platform} onChange={e => setNewGameData({...newGameData, platform: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-neonPurple" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-white/40 mb-2">رابط الصورة (Unsplash URL)</label>
+                  <input type="text" required value={newGameData.image} onChange={e => setNewGameData({...newGameData, image: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-neonPurple" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-white/40 mb-2">التاق (مثال: جديد، عرض)</label>
+                  <input type="text" value={newGameData.tag} onChange={e => setNewGameData({...newGameData, tag: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-neonPurple" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-white/40 mb-2">الأداء مقابل الريال</label>
+                  <input type="text" value={newGameData.perf} onChange={e => setNewGameData({...newGameData, perf: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-neonPurple" />
+                </div>
+                <button type="submit" className="col-span-2 bg-neonPurple py-4 rounded-xl font-bold mt-4 shadow-lg shadow-neonPurple/20">حفظ اللعبة</button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Edit Game Modal */}
+        {editingGame && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setEditingGame(null)} />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-2xl glass neon-border-blue rounded-[2.5rem] p-10">
+              <h3 className="text-2xl font-black mb-8">تعديل: {editingGame.title}</h3>
+              <form onSubmit={handleUpdateGame} className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-white/40 mb-2">السعر الجديد (SAR)</label>
+                  <input type="number" value={editingGame.price} onChange={e => setEditingGame({...editingGame, price: Number(e.target.value)})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-white/40 mb-2">الحالة</label>
+                  <select value={editingGame.status} onChange={e => setEditingGame({...editingGame, status: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue">
+                    <option value="In Stock" className="bg-black">متوفر (In Stock)</option>
+                    <option value="Out of Stock" className="bg-black">منتهي (Out of Stock)</option>
+                  </select>
+                </div>
+                <div className="col-span-2 flex gap-4 mt-6">
+                  <button type="submit" className="flex-1 bg-iceBlue text-black py-4 rounded-xl font-bold">تحديث البيانات</button>
+                  <button type="button" onClick={() => setEditingGame(null)} className="flex-1 bg-white/5 py-4 rounded-xl font-bold">إلغاء</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        <footer className="mt-20 text-center text-[10px] text-white/20 uppercase tracking-widest pb-10">Ghost Keys Admin System • Version 1.1.0 • Made with ❤️ by N58</footer>
       </main>
     </div>
   );
