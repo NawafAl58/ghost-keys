@@ -29,7 +29,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'keys' | 'sales'>('overview');
   
-  const { games, keys, sales, addKey, updateGame, addGame, isLoaded } = useGhostStore();
+  const { games, keys, sales, addKey, deleteKey, updateGame, addGame, deleteGame, isLoaded } = useGhostStore();
 
   // Form States
   const [isAddingGame, setIsAddingGame] = useState(false);
@@ -80,6 +80,18 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteGame = (id: number) => {
+    if (confirm('هل أنت متأكد من حذف هذه اللعبة وجميع الأكواد التابعة لها؟')) {
+      deleteGame(id);
+    }
+  };
+
+  const handleDeleteKey = (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا الكود؟')) {
+      deleteKey(id);
+    }
+  };
+
   if (!isLoaded) return <div className="min-h-screen bg-background" />;
 
   if (!isAuthenticated) {
@@ -103,14 +115,14 @@ export default function AdminPage() {
       <aside className="w-64 border-l border-white/5 glass hidden lg:flex flex-col fixed inset-y-0 right-0">
         <div className="p-8">
           <div className="flex items-center gap-2 mb-10">
-            <div className="w-8 h-8 rounded-lg bg-neonPurple flex items-center justify-center"><Settings size={18} /></div>
+            <div className="w-8 h-8 rounded-lg bg-neonPurple flex items-center justify-center font-black">N58</div>
             <span className="font-bold tracking-tighter text-xl">لوحة <span className="text-neonPurple">التحكم</span></span>
           </div>
           <nav className="space-y-2">
             {[
               { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
               { id: 'inventory', label: 'إدارة الألعاب', icon: Package },
-              { id: 'keys', label: 'إضافة أكواد', icon: KeyIcon },
+              { id: 'keys', label: 'إدارة الأكواد', icon: KeyIcon },
               { id: 'sales', label: 'سجل المبيعات', icon: BarChart3 },
             ].map((item) => (
               <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${activeTab === item.id ? 'bg-neonPurple text-white shadow-lg shadow-neonPurple/20' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}><item.icon size={18} />{item.label}</button>
@@ -179,7 +191,10 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="px-8 py-6">
-                          <button onClick={() => setEditingGame(game)} className="p-2 hover:text-neonPurple transition-colors"><Edit2 size={18} /></button>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setEditingGame(game)} className="p-2 hover:text-neonPurple transition-colors"><Edit2 size={18} /></button>
+                            <button onClick={() => handleDeleteGame(game.id)} className="p-2 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -190,33 +205,68 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'keys' && (
-            <motion.div key="keys" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl">
-              <div className="glass p-8 rounded-[2rem] border-white/5">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><KeyIcon className="text-iceBlue" /> إضافة أكواد تفعيل</h3>
-                <form onSubmit={handleAddKey} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-white/40 mb-2">اختر اللعبة</label>
-                    <select 
-                      value={newKeyData.gameId}
-                      onChange={(e) => setNewKeyData({...newKeyData, gameId: Number(e.target.value)})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue"
-                    >
-                      <option value={0} className="bg-black">--- اختر لعبة ---</option>
-                      {games.map(g => <option key={g.id} value={g.id} className="bg-black">{g.title}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-white/40 mb-2">كود التفعيل (Key)</label>
-                    <input 
-                      type="text" 
-                      placeholder="XXXX-XXXX-XXXX"
-                      value={newKeyData.value}
-                      onChange={(e) => setNewKeyData({...newKeyData, value: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue font-mono"
-                    />
-                  </div>
-                  <button type="submit" className="w-full bg-iceBlue text-black font-bold py-4 rounded-xl hover:brightness-110 transition-all">حفظ الكود في المخزن</button>
-                </form>
+            <motion.div key="keys" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+              <div className="max-w-2xl">
+                <div className="glass p-8 rounded-[2rem] border-white/5">
+                  <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><KeyIcon className="text-iceBlue" /> إضافة أكواد تفعيل</h3>
+                  <form onSubmit={handleAddKey} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-white/40 mb-2">اختر اللعبة</label>
+                      <select 
+                        value={newKeyData.gameId}
+                        onChange={(e) => setNewKeyData({...newKeyData, gameId: Number(e.target.value)})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue"
+                      >
+                        <option value={0} className="bg-black">--- اختر لعبة ---</option>
+                        {games.map(g => <option key={g.id} value={g.id} className="bg-black">{g.title}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-white/40 mb-2">كود التفعيل (Key)</label>
+                      <input 
+                        type="text" 
+                        placeholder="XXXX-XXXX-XXXX"
+                        value={newKeyData.value}
+                        onChange={(e) => setNewKeyData({...newKeyData, value: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 outline-none focus:border-iceBlue font-mono"
+                      />
+                    </div>
+                    <button type="submit" className="w-full bg-iceBlue text-black font-bold py-4 rounded-xl hover:brightness-110 transition-all">حفظ الكود في المخزن</button>
+                  </form>
+                </div>
+              </div>
+
+              <div className="glass rounded-[2rem] overflow-hidden border-white/5">
+                <div className="p-8 border-b border-white/5">
+                  <h3 className="text-xl font-bold">الأكواد المتوفرة في المخزن</h3>
+                </div>
+                <table className="w-full text-right">
+                  <thead className="bg-white/5 text-white/40 text-xs font-bold">
+                    <tr>
+                      <th className="px-8 py-6">اللعبة</th>
+                      <th className="px-8 py-6">الكود</th>
+                      <th className="px-8 py-6">الحالة</th>
+                      <th className="px-8 py-6">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {keys.filter(k => !k.isSold).map(key => {
+                      const game = games.find(g => g.id === key.gameId);
+                      return (
+                        <tr key={key.id} className="hover:bg-white/[0.02]">
+                          <td className="px-8 py-6 font-bold">{game?.title || 'Unknown'}</td>
+                          <td className="px-8 py-6 font-mono text-iceBlue">{key.value}</td>
+                          <td className="px-8 py-6">
+                            <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-green-500/10 text-green-500">متوفر</span>
+                          </td>
+                          <td className="px-8 py-6">
+                            <button onClick={() => handleDeleteKey(key.id)} className="p-2 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </motion.div>
           )}
@@ -314,7 +364,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <footer className="mt-20 text-center text-[10px] text-white/20 uppercase tracking-widest pb-10">Ghost Keys Admin System • Version 1.1.0 • Made with ❤️ by N58</footer>
+        <footer className="mt-20 text-center text-[10px] text-white/20 uppercase tracking-widest pb-10">Ghost Keys Admin System • Version 1.2.0 • Made with ❤️ by N58</footer>
       </main>
     </div>
   );
