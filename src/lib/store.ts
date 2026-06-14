@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from './supabase';
 
 export interface Game {
   id: number;
@@ -27,58 +28,10 @@ export interface Sale {
   keyId: string;
   keyValue: string;
   soldAt: string;
+  buyer_name?: string;
+  buyer_email?: string;
+  buyer_phone?: string;
 }
-
-const INITIAL_GAMES: Game[] = [
-  {
-    id: 1,
-    title: "Call of Duty: Black Ops 6",
-    price: 299,
-    platform: "Battle.net",
-    image: "https://images.unsplash.com/photo-1614010224047-ff709b0bc3d0?w=800&q=80",
-    tag: "الأكثر مبيعاً",
-    perf: "ممتاز",
-    status: 'In Stock'
-  },
-  {
-    id: 2,
-    title: "Elden Ring: Shadow of the Erdtree",
-    price: 189,
-    platform: "Steam",
-    image: "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=800&q=80",
-    tag: "تقييم عالي",
-    perf: "أداء خرافي",
-    status: 'In Stock'
-  },
-  {
-    id: 3,
-    title: "Cyberpunk 2077: Ultimate Edition",
-    price: 145,
-    platform: "GOG / Steam",
-    image: "https://images.unsplash.com/photo-1605898960710-9ec87b46927a?w=800&q=80",
-    tag: "أفضل قيمة",
-    perf: "يحتاج كرت قوي",
-    status: 'In Stock'
-  },
-  {
-    id: 4,
-    title: "Grand Theft Auto V: Premium Edition",
-    price: 55,
-    platform: "Rockstar / Epic",
-    image: "https://images.unsplash.com/photo-1541562232579-512a21360020?w=800&q=80",
-    tag: "صفقة اليوم",
-    perf: "يشتغل على أي شي",
-    status: 'In Stock'
-  }
-];
-
-const INITIAL_KEYS: Key[] = [
-  { id: 'k1', gameId: 1, value: 'GK-COD-6-BO-XXXX-1', isSold: false },
-  { id: 'k2', gameId: 1, value: 'GK-COD-6-BO-XXXX-2', isSold: false },
-  { id: 'k3', gameId: 2, value: 'GK-ELDEN-SOT-XXXX-1', isSold: false },
-  { id: 'k4', gameId: 3, value: 'GK-CP2077-UE-XXXX-1', isSold: false },
-  { id: 'k5', gameId: 4, value: 'GK-GTAV-PREM-XXXX-1', isSold: false },
-];
 
 export function useGhostStore() {
   const [games, setGames] = useState<Game[]>([]);
@@ -86,73 +39,198 @@ export function useGhostStore() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
-    const savedGames = localStorage.getItem('ghost_games');
-    const savedKeys = localStorage.getItem('ghost_keys');
-    const savedSales = localStorage.getItem('ghost_sales');
+  const fetchStoreData = async () => {
+    try {
+      // Fetch Games
+      const { data: gamesData, error: gamesError } = await supabase
+        .from('games')
+        .select('*')
+        .order('id', { ascending: true });
+      
+      if (gamesError) throw gamesError;
 
-    setGames(savedGames ? JSON.parse(savedGames) : INITIAL_GAMES);
-    setKeys(savedKeys ? JSON.parse(savedKeys) : INITIAL_KEYS);
-    setSales(savedSales ? JSON.parse(savedSales) : []);
-    setIsLoaded(true);
+      // Fetch Keys
+      const { data: keysData, error: keysError } = await supabase
+        .from('keys')
+        .select('*');
+      
+      if (keysError) throw keysError;
+
+      // Fetch Orders (Sales)
+      const { data: salesData, error: salesError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          game_id,
+          key_id,
+          price_paid,
+          buyer_name,
+          buyer_email,
+          buyer_phone,
+          created_at,
+          games (title),
+          keys (key_value)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (salesError) throw salesError;
+
+      setGames(gamesData.map((g: any) => ({
+        id: g.id,
+        title: g.title,
+        price: g.price,
+        platform: g.platform || 'PC',
+        image: g.image,
+        tag: g.tag || 'جديد',
+        perf: g.perf || 'ممتاز',
+        status: g.status || 'In Stock'
+      })));
+
+      setKeys(keysData.map((k: any) => ({
+        id: k.id,
+        gameId: k.game_id,
+        value: k.key_value,
+        isSold: k.is_sold,
+        soldAt: k.sold_at
+      })));
+
+      setSales(salesData.map((s: any) => ({
+        id: s.id,
+        gameId: s.game_id,
+        gameTitle: s.games?.title || 'Unknown Game',
+        price: s.price_paid,
+        keyId: s.key_id,
+        keyValue: s.keys?.key_value || 'Unknown Key',
+        soldAt: s.created_at,
+        buyer_name: s.buyer_name,
+        buyer_email: s.buyer_email,
+        buyer_phone: s.buyer_phone
+      })));
+
+      setIsLoaded(true);
+    } catch (error) {
+      console.error('Error fetching data from Supabase:', error);
+      setIsLoaded(true); // Still set to loaded to avoid infinite spinner, but could show error UI
+    }
+  };
+
+  useEffect(() => {
+    fetchStoreData();
   }, []);
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('ghost_games', JSON.stringify(games));
-      localStorage.setItem('ghost_keys', JSON.stringify(keys));
-      localStorage.setItem('ghost_sales', JSON.stringify(sales));
+  const addKey = async (gameId: number, value: string) => {
+    const { data, error } = await supabase
+      .from('keys')
+      .insert([{ game_id: gameId, key_value: value, is_sold: false }])
+      .select();
+    
+    if (!error && data) {
+      setKeys([...keys, { 
+        id: data[0].id, 
+        gameId: data[0].game_id, 
+        value: data[0].key_value, 
+        isSold: data[0].is_sold 
+      }]);
     }
-  }, [games, keys, sales, isLoaded]);
-
-  const addKey = (gameId: number, value: string) => {
-    const newKey: Key = { id: Math.random().toString(36).substr(2, 9), gameId, value, isSold: false };
-    setKeys([...keys, newKey]);
   };
 
-  const deleteKey = (keyId: string) => {
-    setKeys(keys.filter(k => k.id !== keyId));
+  const deleteKey = async (keyId: string) => {
+    const { error } = await supabase.from('keys').delete().eq('id', keyId);
+    if (!error) {
+      setKeys(keys.filter(k => k.id !== keyId));
+    }
   };
 
-  const sellGame = (gameId: number) => {
-    const availableKeyIndex = keys.findIndex(k => k.gameId === gameId && !k.isSold);
-    if (availableKeyIndex === -1) return null;
+  const sellGame = async (gameId: number, buyerInfo?: { name: string, email: string, phone: string }) => {
+    // 1. Get available key
+    const { data: availableKeys, error: keyFetchError } = await supabase
+      .from('keys')
+      .select('*')
+      .eq('game_id', gameId)
+      .eq('is_sold', false)
+      .limit(1);
 
+    if (keyFetchError || !availableKeys || availableKeys.length === 0) return null;
+    const key = availableKeys[0];
     const game = games.find(g => g.id === gameId);
     if (!game) return null;
 
-    const key = keys[availableKeyIndex];
-    const newKeys = [...keys];
-    newKeys[availableKeyIndex] = { ...key, isSold: true, soldAt: new Date().toISOString() };
+    // 2. Mark key as sold
+    const { error: keyUpdateError } = await supabase
+      .from('keys')
+      .update({ is_sold: true, sold_at: new Date().toISOString() })
+      .eq('id', key.id);
+
+    if (keyUpdateError) return null;
+
+    // 3. Create order
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert([{
+        game_id: gameId,
+        key_id: key.id,
+        price_paid: game.price,
+        buyer_name: buyerInfo?.name || 'Guest',
+        buyer_email: buyerInfo?.email || 'N/A',
+        buyer_phone: buyerInfo?.phone || 'N/A',
+        status: 'completed'
+      }])
+      .select();
+
+    if (orderError) return null;
+
+    await fetchStoreData(); // Refresh local state
+    return key.key_value;
+  };
+
+  const updateGame = async (updatedGame: Game) => {
+    const { error } = await supabase
+      .from('games')
+      .update({
+        title: updatedGame.title,
+        price: updatedGame.price,
+        platform: updatedGame.platform,
+        image: updatedGame.image,
+        tag: updatedGame.tag,
+        perf: updatedGame.perf,
+        status: updatedGame.status
+      })
+      .eq('id', updatedGame.id);
+
+    if (!error) {
+      setGames(games.map(g => g.id === updatedGame.id ? updatedGame : g));
+    }
+  };
+
+  const addGame = async (newGame: Omit<Game, 'id'>) => {
+    const { data, error } = await supabase
+      .from('games')
+      .insert([{
+        title: newGame.title,
+        price: newGame.price,
+        platform: newGame.platform,
+        image: newGame.image,
+        tag: newGame.tag,
+        perf: newGame.perf,
+        status: newGame.status
+      }])
+      .select();
+
+    if (!error && data) {
+      setGames([...games, { ...newGame, id: data[0].id }]);
+    }
+  };
+
+  const deleteGame = async (gameId: number) => {
+    // Delete keys first due to FK
+    await supabase.from('keys').delete().eq('game_id', gameId);
+    const { error } = await supabase.from('games').delete().eq('id', gameId);
     
-    const newSale: Sale = {
-      id: Math.random().toString(36).substr(2, 9),
-      gameId,
-      gameTitle: game.title,
-      price: game.price,
-      keyId: key.id,
-      keyValue: key.value,
-      soldAt: new Date().toISOString()
-    };
-
-    setKeys(newKeys);
-    setSales([newSale, ...sales]);
-    return key.value;
+    if (!error) {
+      setGames(games.filter(g => g.id !== gameId));
+      setKeys(keys.filter(k => k.gameId !== gameId));
+    }
   };
 
-  const updateGame = (updatedGame: Game) => {
-    setGames(games.map(g => g.id === updatedGame.id ? updatedGame : g));
-  };
-
-  const addGame = (newGame: Omit<Game, 'id'>) => {
-    const id = games.length > 0 ? Math.max(...games.map(g => g.id)) + 1 : 1;
-    setGames([...games, { ...newGame, id }]);
-  };
-
-  const deleteGame = (gameId: number) => {
-    setGames(games.filter(g => g.id !== gameId));
-    setKeys(keys.filter(k => k.gameId !== gameId));
-  };
-
-  return { games, keys, sales, addKey, deleteKey, sellGame, updateGame, addGame, deleteGame, isLoaded };
+  return { games, keys, sales, addKey, deleteKey, sellGame, updateGame, addGame, deleteGame, isLoaded, refresh: fetchStoreData };
 }
