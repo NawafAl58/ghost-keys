@@ -17,7 +17,11 @@ import {
   Trash2,
   Save,
   X,
-  PlusCircle
+  PlusCircle,
+  User,
+  Mail,
+  Phone,
+  Clock
 } from 'lucide-react';
 import { useGhostStore, Game } from '@/lib/store';
 
@@ -56,43 +60,47 @@ export default function AdminPage() {
     }
   };
 
-  const handleAddGame = (e: React.FormEvent) => {
+  const handleAddGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    addGame(newGameData);
+    await addGame(newGameData);
     setIsAddingGame(false);
     setNewGameData({ title: '', price: 0, platform: 'Steam', image: '', tag: 'جديد', perf: 'ممتاز', status: 'In Stock' });
   };
 
-  const handleUpdateGame = (e: React.FormEvent) => {
+  const handleUpdateGame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingGame) {
-      updateGame(editingGame);
+      await updateGame(editingGame);
       setEditingGame(null);
     }
   };
 
-  const handleAddKey = (e: React.FormEvent) => {
+  const handleAddKey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newKeyData.gameId && newKeyData.value) {
-      addKey(Number(newKeyData.gameId), newKeyData.value);
+      await addKey(Number(newKeyData.gameId), newKeyData.value);
       setNewKeyData({ gameId: 0, value: '' });
       alert("تمت إضافة الكود بنجاح!");
     }
   };
 
-  const handleDeleteGame = (id: number) => {
+  const handleDeleteGame = async (id: number) => {
     if (confirm('هل أنت متأكد من حذف هذه اللعبة وجميع الأكواد التابعة لها؟')) {
-      deleteGame(id);
+      await deleteGame(id);
     }
   };
 
-  const handleDeleteKey = (id: string) => {
+  const handleDeleteKey = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا الكود؟')) {
-      deleteKey(id);
+      await deleteKey(id);
     }
   };
 
-  if (!isLoaded) return <div className="min-h-screen bg-background" />;
+  if (!isLoaded) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+       <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-10 h-10 border-4 border-neonPurple border-t-transparent rounded-full" />
+    </div>
+  );
 
   if (!isAuthenticated) {
     return (
@@ -115,7 +123,7 @@ export default function AdminPage() {
       <aside className="w-64 border-l border-white/5 glass hidden lg:flex flex-col fixed inset-y-0 right-0">
         <div className="p-8">
           <div className="flex items-center gap-2 mb-10">
-            <div className="w-8 h-8 rounded-lg bg-neonPurple flex items-center justify-center font-black">N58</div>
+            <div className="w-10 h-10 rounded-lg bg-neonPurple flex items-center justify-center font-black text-xl">N58</div>
             <span className="font-bold tracking-tighter text-xl">لوحة <span className="text-neonPurple">التحكم</span></span>
           </div>
           <nav className="space-y-2">
@@ -123,7 +131,7 @@ export default function AdminPage() {
               { id: 'overview', label: 'الإحصائيات', icon: LayoutDashboard },
               { id: 'inventory', label: 'إدارة الألعاب', icon: Package },
               { id: 'keys', label: 'إدارة الأكواد', icon: KeyIcon },
-              { id: 'sales', label: 'سجل المبيعات', icon: BarChart3 },
+              { id: 'sales', label: 'سجل الطلبات', icon: BarChart3 },
             ].map((item) => (
               <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${activeTab === item.id ? 'bg-neonPurple text-white shadow-lg shadow-neonPurple/20' : 'text-white/50 hover:bg-white/5 hover:text-white'}`}><item.icon size={18} />{item.label}</button>
             ))}
@@ -140,7 +148,7 @@ export default function AdminPage() {
             {activeTab === 'overview' && 'نظرة عامة'}
             {activeTab === 'inventory' && 'المخزون والأسعار'}
             {activeTab === 'keys' && 'إدارة مفاتيح الألعاب'}
-            {activeTab === 'sales' && 'سجل العمليات'}
+            {activeTab === 'sales' && 'سجل العمليات والطلبات'}
           </h2>
           {activeTab === 'inventory' && (
             <button 
@@ -157,7 +165,7 @@ export default function AdminPage() {
           {activeTab === 'overview' && (
             <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard label="إجمالي الأرباح" value={`${sales.reduce((acc, s) => acc + s.price, 0)} SAR`} icon={TrendingUp} color="purple" />
+                <StatCard label="إجمالي المبيعات" value={`${sales.reduce((acc, s) => acc + s.price, 0)} SAR`} icon={TrendingUp} color="purple" />
                 <StatCard label="الطلبات المكتملة" value={sales.length.toString()} icon={ShoppingCart} color="blue" />
                 <StatCard label="الأكواد المتوفرة" value={keys.filter(k => !k.isSold).length.toString()} icon={Database} color="ice" />
               </div>
@@ -238,7 +246,7 @@ export default function AdminPage() {
 
               <div className="glass rounded-[2rem] overflow-hidden border-white/5">
                 <div className="p-8 border-b border-white/5">
-                  <h3 className="text-xl font-bold">الأكواد المتوفرة في المخزن</h3>
+                  <h3 className="text-xl font-bold">الأكواد المتوفرة في المخزن (قاعدة بيانات Supabase)</h3>
                 </div>
                 <table className="w-full text-right">
                   <thead className="bg-white/5 text-white/40 text-xs font-bold">
@@ -272,35 +280,64 @@ export default function AdminPage() {
           )}
 
           {activeTab === 'sales' && (
-             <motion.div key="sales" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-[2rem] overflow-hidden border-white/5">
-                <table className="w-full text-right">
-                  <thead className="bg-white/5 text-white/40 text-xs font-bold">
-                    <tr>
-                      <th className="px-8 py-6">الطلب</th>
-                      <th className="px-8 py-6">التاريخ</th>
-                      <th className="px-8 py-6">الكود المباع</th>
-                      <th className="px-8 py-6">المبلغ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {sales.map(sale => (
-                      <tr key={sale.id}>
-                        <td className="px-8 py-6">
-                          <div className="font-bold">{sale.gameTitle}</div>
-                          <div className="text-[10px] text-white/20">ID: {sale.id}</div>
-                        </td>
-                        <td className="px-8 py-6 text-sm text-white/40">{new Date(sale.soldAt).toLocaleString('ar-SA')}</td>
-                        <td className="px-8 py-6 font-mono text-iceBlue">{sale.keyValue}</td>
-                        <td className="px-8 py-6 font-black text-neonPurple">{sale.price} SAR</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+             <motion.div key="sales" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                <div className="grid grid-cols-1 gap-6">
+                  {sales.map(sale => (
+                    <div key={sale.id} className="glass p-8 rounded-[2rem] border-white/5 hover:border-neonPurple/30 transition-all group">
+                      <div className="flex flex-wrap justify-between gap-6">
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-neonPurple/10 flex items-center justify-center text-neonPurple font-black">N58</div>
+                            <div>
+                              <h4 className="text-xl font-black">{sale.gameTitle}</h4>
+                              <div className="text-[10px] text-white/20 uppercase tracking-widest font-bold">Order ID: {sale.id}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
+                            <div className="space-y-1">
+                              <div className="text-[10px] text-white/40 font-bold uppercase flex items-center gap-1"><User size={10} /> المشتري</div>
+                              <div className="font-bold text-sm text-iceBlue">{sale.buyer_name || 'ضيف'}</div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-[10px] text-white/40 font-bold uppercase flex items-center gap-1"><Mail size={10} /> البريد الإلكتروني</div>
+                              <div className="text-sm">{sale.buyer_email || 'N/A'}</div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-[10px] text-white/40 font-bold uppercase flex items-center gap-1"><Phone size={10} /> رقم التواصل</div>
+                              <div className="text-sm">{sale.buyer_phone || 'N/A'}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end justify-between gap-4">
+                          <div className="text-right">
+                             <div className="text-[10px] text-white/40 font-bold uppercase mb-1">المبلغ المدفوع</div>
+                             <div className="text-2xl font-black text-neonPurple">{sale.price} SAR</div>
+                          </div>
+                          <div className="text-right">
+                             <div className="text-[10px] text-white/40 font-bold uppercase mb-1 flex items-center justify-end gap-1"><Clock size={10}/> وقت الشراء</div>
+                             <div className="text-xs text-white/60">{new Date(sale.soldAt).toLocaleString('ar-SA')}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                           <KeyIcon size={14} className="text-iceBlue" />
+                           <span className="text-[10px] text-white/40 font-bold uppercase">الكود المستلم:</span>
+                           <span className="font-mono text-sm bg-white/5 px-3 py-1 rounded-lg text-iceBlue">{sale.keyValue}</span>
+                        </div>
+                        <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-green-500/10 text-green-500 uppercase">Completed</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
              </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Add Game Modal */}
+        {/* Modals remain same as before with await in handlers */}
         {isAddingGame && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsAddingGame(false)} />
@@ -337,7 +374,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Edit Game Modal */}
         {editingGame && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setEditingGame(null)} />
@@ -364,7 +400,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <footer className="mt-20 text-center text-[10px] text-white/20 uppercase tracking-widest pb-10">Ghost Keys Admin System • Version 1.2.0 • Made with ❤️ by N58</footer>
+        <footer className="mt-20 text-center text-[10px] text-white/20 uppercase tracking-widest pb-10">Ghost Keys Admin System • Supabase Cloud Persistence • Made by N58</footer>
       </main>
     </div>
   );
